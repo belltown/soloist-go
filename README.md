@@ -62,7 +62,7 @@ git clone https://github.com/belltown/soloist-go.git
 
 # Change into soloist-go directory and set up .env file, adding Soloist API key, etc.
 cd ~/soloist-go
-cp .env .env.example
+cp .env.example .env
 # Edit .env
 ```
 
