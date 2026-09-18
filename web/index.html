@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Soloist</title>
+<style>
+  :root {
+    --accent: #1db954;
+    --bg: #0a0a0d;
+    --card-bg: #16161c;
+    --text: #f5f5f7;
+    --muted: #9a9aa5;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    height: 100%;
+  }
+  body {
+    padding: clamp(1rem, 2vw, 2.5rem);
+    display: flex;
+    flex-direction: column;
+    gap: clamp(1rem, 2vh, 2rem);
+    min-height: 100vh;
+  }
+
+  /* Now playing */
+  #now-card {
+    background: linear-gradient(135deg, #1a2f22, #101014);
+    border: 1px solid #263329;
+    border-radius: 1.5rem;
+    padding: 2vh clamp(1.5rem, 3vw, 3rem);
+    height: 15vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  #now-top {
+    display: flex;
+    align-items: baseline;
+    gap: clamp(1rem, 2vw, 2rem);
+  }
+  #now-dance {
+    font-size: 5.5vh;
+    font-weight: 800;
+    line-height: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: none;
+  }
+  #now-remaining {
+    font-size: 4vh;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+    white-space: nowrap;
+    line-height: 1;
+    margin-left: auto;
+    flex: none;
+  }
+  #now-bar {
+    height: 1vh;
+    /* background: #2a2a32;*/
+    background: #ebebeb;
+    border-radius: 999px;
+    overflow: hidden;
+    flex: none;
+  }
+  #now-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    transition: width 0.2s linear;
+  }
+  #now-meta {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    gap: clamp(1rem, 2vw, 2rem);
+    min-width: 0;
+    flex: 1;
+  }
+  #now-tempo {
+    font-size: 3.2vh;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+    line-height: 1;
+    flex: none;
+  }
+  #now-track {
+    font-size: 2.4vh;
+    color: var(--muted);
+    line-height: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  /* Up next */
+  #queue-section { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  #queue-label {
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    font-size: clamp(1rem, 1.3vw, 1.3rem);
+    font-weight: 700;
+    margin: 0 0 0.75rem 0.25rem;
+  }
+  #queue-wrap {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  #queue {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 clamp(0.4rem, 1vh, 0.75rem);
+  }
+  .queue-row td {
+    background: var(--card-bg);
+    border-top: 1px solid #232329;
+    border-bottom: 1px solid #232329;
+    padding: 0.4rem clamp(1rem, 1.6vw, 1.5rem);
+    vertical-align: middle;
+  }
+  .queue-row td:first-child {
+    border-left: 1px solid #232329;
+    border-top-left-radius: 0.75rem;
+    border-bottom-left-radius: 0.75rem;
+  }
+  .queue-row td:last-child {
+    border-right: 1px solid #232329;
+    border-top-right-radius: 0.75rem;
+    border-bottom-right-radius: 0.75rem;
+    width: 100%;
+  }
+  .queue-dance {
+    font-size: clamp(1.4rem, 2.2vw, 2rem);
+    font-weight: 800;
+    white-space: nowrap;
+  }
+  .queue-tempo {
+    font-size: clamp(1rem, 1.4vw, 1.3rem);
+    font-weight: 600;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  .queue-track {
+    font-size: clamp(0.9rem, 1.2vw, 1.1rem);
+    color: var(--muted);
+    overflow-wrap: break-word;
+  }
+
+  #status {
+    position: fixed;
+    bottom: 0.5rem;
+    right: 0.75rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+</style>
+</head>
+<body>
+  <div id="now-card">
+    <div id="now-top">
+      <div id="now-dance">&mdash;</div>
+      <div id="now-meta">
+        <div id="now-tempo"></div>
+        <div id="now-track"></div>
+      </div>
+      <div id="now-remaining">&ndash;:&ndash;&ndash;</div>
+    </div>
+    <div id="now-bar"><div id="now-bar-fill"></div></div>
+  </div>
+
+  <div id="queue-section">
+    <div id="queue-label">Up Next</div>
+    <div id="queue-wrap">
+      <table id="queue">
+        <tbody id="queue-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="status"></div>
+
+  <script>
+    function formatDuration(ms) {
+      if (!ms || ms < 0) return "0:00";
+      const totalSeconds = Math.round(ms / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = String(totalSeconds % 60).padStart(2, "0");
+      return minutes + ":" + seconds;
+    }
+
+    function bpm(track) {
+      return track.override_tempo > 0 ? track.override_tempo : track.tempo;
+    }
+
+    let durationMs = 0;
+    let position = { position_ms: 0, timestamp_ms: 0, speed: 0 };
+
+    function estimatePositionMs() {
+      const elapsed = Date.now() - position.timestamp_ms;
+      return position.position_ms + elapsed * position.speed;
+    }
+
+    function renderProgress() {
+      const posMs = Math.max(0, Math.min(estimatePositionMs(), durationMs || Infinity));
+      const remainingMs = Math.max(0, durationMs - posMs);
+      document.getElementById("now-remaining").textContent =
+        durationMs ? "-" + formatDuration(remainingMs) : "\u2013:\u2013\u2013";
+      const pct = durationMs > 0 ? (posMs / durationMs) * 100 : 0;
+      document.getElementById("now-bar-fill").style.width = Math.max(0, Math.min(100, pct)) + "%";
+    }
+
+    setInterval(renderProgress, 250);
+
+    function renderQueueItem(track) {
+      const row = document.createElement("tr");
+      row.className = "queue-row";
+
+      const danceCell = document.createElement("td");
+      danceCell.className = "queue-dance";
+      danceCell.textContent = track.dance || "\u2014";
+      row.appendChild(danceCell);
+
+      const tempo = bpm(track);
+      const tempoCell = document.createElement("td");
+      tempoCell.className = "queue-tempo";
+      tempoCell.textContent = tempo ? tempo + " bpm" : "";
+      row.appendChild(tempoCell);
+
+      const trackCell = document.createElement("td");
+      trackCell.className = "queue-track";
+      trackCell.textContent = (track.track_name || "Unknown track") +
+        (track.artist_name ? " \u2014 " + track.artist_name : "");
+      row.appendChild(trackCell);
+
+      return row;
+    }
+
+    function connect() {
+      const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(proto + "//" + location.host + "/ws");
+      const status = document.getElementById("status");
+
+      ws.onopen = () => { status.textContent = ""; };
+      ws.onclose = () => {
+        status.textContent = "Disconnected, retrying\u2026";
+        setTimeout(connect, 2000);
+      };
+      ws.onerror = () => ws.close();
+      ws.onmessage = (event) => {
+        const state = JSON.parse(event.data);
+        const now = state.now_playing || {};
+
+        document.getElementById("now-dance").textContent = now.dance || "\u2014";
+
+        const nowTempo = bpm(now);
+        document.getElementById("now-tempo").textContent = nowTempo ? nowTempo + " bpm" : "";
+
+        document.getElementById("now-track").textContent = (now.track_name || "Nothing playing") +
+          (now.artist_name ? " \u2014 " + now.artist_name : "");
+
+        durationMs = now.duration || 0;
+        if (state.position) {
+          position = state.position;
+        }
+        renderProgress();
+
+        const queue = document.getElementById("queue-body");
+        queue.innerHTML = "";
+        (state.queue || []).forEach((track) => {
+          queue.appendChild(renderQueueItem(track));
+        });
+      };
+    }
+
+    connect();
+  </script>
+</body>
+</html>
+
+
